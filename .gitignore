@@ -1,0 +1,21 @@
+# Build output (CMake / CLion)
+build/
+cmake-build-*/
+
+# Compiler / linker artifacts (in case any land outside build/)
+*.d
+*.o
+*.obj
+*.elf
+*.map
+*.su
+
+# Claude Code
+CLAUDE.md
+
+# CLion per-user state
+.idea/workspace.xml
+.idea/shelf/
+
+# Debugger state (SEGGER Ozone)
+*.jdebug*
