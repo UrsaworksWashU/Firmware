@@ -16,6 +16,7 @@ CLAUDE.md
 # CLion per-user state
 .idea/workspace.xml
 .idea/shelf/
+.idea/waveformPlotter.xml
 
 # Debugger state (SEGGER Ozone)
 *.jdebug*

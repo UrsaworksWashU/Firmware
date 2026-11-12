@@ -32,9 +32,7 @@ message("Build type: " ${CMAKE_BUILD_TYPE})
 enable_language(C ASM)
 
 # Create an executable object type
-add_executable(${CMAKE_PROJECT_NAME}
-        02_module/motor/CAN_receive.c
-        02_module/motor/CAN_receive.h)
+add_executable(${CMAKE_PROJECT_NAME})
 
 # Recursively collect user code from the numbered layer folders (01_bsp, 02_module, 03_application, ...)
 # CONFIGURE_DEPENDS makes CMake re-run the glob on each build, so new files/folders are picked up automatically

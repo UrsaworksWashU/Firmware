@@ -25,7 +25,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "bsp_can.h"
-#include "CAN_receive.h"
+#include "../../02_module/motor/DJImotor/dji_motor.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -57,7 +57,15 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+/* ---- Temporary dji_motor test. Replace with the chassis application later. ---- */
 
+/* Watch these in Ozone. Change test_output live to drive the motor. */
+CAN_Status_e test_init_status;       /* result of BSP_CAN_Init */
+DJIMotor_t *test_motor;              /* NULL means DJIMotor_Register failed */
+int32_t test_output = 1000;          /* current command for the test motor; try negative values */
+DJIMotor_Measure_t test_measure;     /* consistent snapshot copied every loop */
+CAN_Status_e test_tx_status;         /* result of the latest DJIMotor_SendAll */
+const CAN_Stats_t *test_can1_stats;
 /* USER CODE END 0 */
 
 /**
@@ -102,14 +110,28 @@ int main(void)
   // HAL_TIM_PWM_Start(&htim5, TIM_CHANNEL_2);
   // HAL_TIM_PWM_Start(&htim5, TIM_CHANNEL_3);
   HAL_Delay(500);
-  can_filter_init();
+  test_init_status = BSP_CAN_Init();
+
+  /* The M3508 on CAN1 with ESC ID 2: feedback 0x202, control frame 0x200 slot 1. */
+  const DJIMotor_Config_t motor_cfg = {
+      .type = DJI_MOTOR_M3508,
+      .bus = CAN_BUS_1,
+      .esc_id = 2,
+  };
+  test_motor = DJIMotor_Register(&motor_cfg);
+  test_can1_stats = BSP_CAN_GetStats(CAN_BUS_1);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    CAN_cmd_chassis(1000, 500, 4000, 4000);
+    if (test_motor != NULL)
+    {
+      DJIMotor_SetOutput(test_motor, test_output);
+      DJIMotor_GetMeasure(test_motor, &test_measure);
+    }
+    test_tx_status = DJIMotor_SendAll();
     HAL_Delay(2);
     /* USER CODE END WHILE */
 
