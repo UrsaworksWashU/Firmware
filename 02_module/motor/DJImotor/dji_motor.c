@@ -10,7 +10,7 @@
  */
 
 #include "dji_motor.h"
-#include "main.h" /* CMSIS intrinsics: __get_PRIMASK, __disable_irq, __set_PRIMASK */
+#include "bsp_critical.h"
 #include <stddef.h>
 
 /* ------------------------------ protocol constants ------------------------------ */
@@ -218,12 +218,10 @@ void DJIMotor_GetMeasure(const DJIMotor_t *motor, DJIMotor_Measure_t *out)
     }
 
     /* Critical section: block interrupts so the RX interrupt cannot update measure halfway
-     * through the copy. Save and restore PRIMASK instead of blindly re-enabling, so this is
-     * also correct if the caller had interrupts disabled already. */
-    const uint32_t primask = __get_PRIMASK();
-    __disable_irq();
+     * through the copy. See bsp_critical.h for the rules. */
+    const uint32_t state = BSP_EnterCritical();
     *out = motor->measure;
-    __set_PRIMASK(primask);
+    BSP_ExitCritical(state);
 }
 
 CAN_Status_e DJIMotor_SendAll(void)

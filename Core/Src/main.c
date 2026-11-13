@@ -19,13 +19,17 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "can.h"
+#include "dma.h"
 #include "tim.h"
+#include "usart.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "bsp_can.h"
-#include "../../02_module/motor/DJImotor/dji_motor.h"
+#include "dji_motor.h"
+#include "pid.h"
+#include "dt7.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -57,15 +61,31 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-/* ---- Temporary dji_motor test. Replace with the chassis application later. ---- */
+/* ---- Temporary wheel speed loop test. Replace with the chassis application later. ---- */
 
-/* Watch these in Ozone. Change test_output live to drive the motor. */
+/* Loop period. HAL_Delay(n) waits at least n+1 ticks, so HAL_Delay(1) gives about 2 ms. */
+#define TEST_LOOP_DELAY_MS 1u
+#define TEST_LOOP_DT_S     0.002f
+
+/* Watch these in Ozone. Change test_target_rpm (and test_pid.config gains) live. */
 CAN_Status_e test_init_status;       /* result of BSP_CAN_Init */
 DJIMotor_t *test_motor;              /* NULL means DJIMotor_Register failed */
-int32_t test_output = 1000;          /* current command for the test motor; try negative values */
+bool test_pid_init_ok;               /* false means the PID config was rejected */
+PID_t test_pid;                      /* rotor speed loop: rpm in, raw current out */
+float test_target_rpm = 0.0f;        /* rotor rpm target; try 1000, then negative values */
+float test_pid_output;               /* raw current command from the PID */
 DJIMotor_Measure_t test_measure;     /* consistent snapshot copied every loop */
 CAN_Status_e test_tx_status;         /* result of the latest DJIMotor_SendAll */
 const CAN_Stats_t *test_can1_stats;
+
+/* DT7 remote. Watch test_rc while moving sticks and switches. */
+UART_Status_e test_rc_init_status;   /* result of DT7_Init */
+DT7_Data_t test_rc;                  /* snapshot copied every loop */
+bool test_rc_online;                 /* false: no good frame for 100 ms, test_rc is all zeros */
+const DT7_Stats_t *test_rc_stats;    /* frames_ok should rise by ~70 per second */
+const UART_Stats_t *test_dbus_stats; /* rx_errors rising = wrong UART settings or wiring */
+uint8_t test_rc_drives_motor = 0;    /* 1: left stick vertical sets test_target_rpm (PID mode) */
+#define TEST_RC_RPM_PER_UNIT 3.0f    /* full stick (660) -> about 2000 rotor rpm */
 /* USER CODE END 0 */
 
 /**
@@ -99,10 +119,12 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_TIM5_Init();
   MX_TIM4_Init();
   MX_CAN1_Init();
   MX_CAN2_Init();
+  MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
   // HAL_TIM_Base_Init(&htim4);
   // HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_3);
@@ -120,19 +142,43 @@ int main(void)
   };
   test_motor = DJIMotor_Register(&motor_cfg);
   test_can1_stats = BSP_CAN_GetStats(CAN_BUS_1);
+
+  /* Start with P only (ki = 0), tune kp, then add ki. */
+  const PID_Config_t pid_cfg = {
+      .kp = 10.0f,
+      .ki = 0.0f,
+      .kd = 0.0f,
+      .output_max = 16384.0f, /* M3508 / C620 full scale (about 20 A) */
+      .i_out_max = 10000.0f,
+      .d_lpf_alpha = 0.0f,
+  };
+  test_pid_init_ok = PID_Init(&test_pid, &pid_cfg);
+
+  test_rc_init_status = DT7_Init(UART_PORT_DBUS);
+  test_rc_stats = DT7_GetStats();
+  test_dbus_stats = BSP_UART_GetStats(UART_PORT_DBUS);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    if (test_motor != NULL)
+    test_rc_online = DT7_GetData(&test_rc);
+    if (test_rc_drives_motor)
     {
-      DJIMotor_SetOutput(test_motor, test_output);
+      /* Offline gives left_y = 0, so losing the remote stops the motor. */
+      test_target_rpm = (float)test_rc.left_y * TEST_RC_RPM_PER_UNIT;
+    }
+
+    if (test_motor != NULL && test_pid_init_ok)
+    {
       DJIMotor_GetMeasure(test_motor, &test_measure);
+      test_pid_output = PID_Calc(&test_pid, test_target_rpm,
+                                 (float)test_measure.speed_rpm, TEST_LOOP_DT_S);
+      DJIMotor_SetOutput(test_motor, (int32_t)test_pid_output);
     }
     test_tx_status = DJIMotor_SendAll();
-    HAL_Delay(2);
+    HAL_Delay(TEST_LOOP_DELAY_MS);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
