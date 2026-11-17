@@ -19,6 +19,8 @@
 #include "bsp_uart.h"
 #include "dji_motor.h"
 #include "dt7.h"
+#include "host_link.h"
+#include "nav_cmd.h"
 #include "robot_cmd.h"
 #include "gimbal.h"
 #include "chassis.h"
@@ -28,6 +30,8 @@ typedef struct
 {
     CAN_Status_e can_init;
     UART_Status_e rc_init;
+    HostLink_Status_e host_link_init;
+    HostLink_Status_e nav_init;
     CAN_Status_e last_send;
     uint32_t task_count;
 } Robot_Status_t;
@@ -39,6 +43,8 @@ void Robot_Init(void)
     /* bsp and device modules first, then the applications that use them. */
     robot_status.can_init = BSP_CAN_Init();
     robot_status.rc_init = DT7_Init(UART_PORT_DBUS);
+    robot_status.host_link_init = HostLink_Init();
+    robot_status.nav_init = NavCmd_Init();
 
     Gimbal_Init();
     Chassis_Init();

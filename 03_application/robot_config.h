@@ -58,7 +58,7 @@
 /* ------------------------------ chassis limits ------------------------------ */
 
 #define CHASSIS_MAX_ROTOR_RPM   8000.0f /* M3508 tops out near 9000 rotor rpm; keep headroom */
-#define CHASSIS_MAX_ACCEL_XY    2.0f    /* m/s^2, per axis */
+#define CHASSIS_MAX_ACCEL_XY    4.0f    /* m/s^2, per axis */
 #define CHASSIS_MAX_ACCEL_WZ    6.0f    /* rad/s^2 */
 #define CHASSIS_CMD_TIMEOUT_MS  50u     /* no chassis command for this long -> zero force */
 

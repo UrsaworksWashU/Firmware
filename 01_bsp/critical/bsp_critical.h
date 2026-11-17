@@ -44,4 +44,14 @@ static inline void BSP_ExitCritical(uint32_t primask)
     __set_PRIMASK(primask);
 }
 
+/**
+ * Memory barrier: every memory write before it is done before any memory access after it,
+ * and the compiler may not move memory accesses across it. It does NOT block interrupts.
+ * Use for "write the data, barrier, then set the flag that makes it visible to an interrupt".
+ */
+static inline void BSP_MemoryBarrier(void)
+{
+    __DMB();
+}
+
 #endif /* BSP_CRITICAL_H */
